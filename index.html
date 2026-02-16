@@ -187,7 +187,7 @@
     </script>
 
 <script>
-let originalUrl = '';  // set on load
+let originalUrl = '';
 
 function loadSite(customUrl = null) {
   let url = customUrl || urlInput.value.trim();
@@ -199,33 +199,17 @@ function loadSite(customUrl = null) {
   if (!customUrl) saveToHistory(url);
 }
 
-// Only check after initial load + short delay
-iframe.addEventListener('load', () => {
-  setTimeout(checkIfBlocked, 1200);
-});
-
-function checkIfBlocked() {
+setInterval(() => {
   if (!originalUrl) return;
-
   try {
-    const loc = iframe.contentWindow.location.href;
-    // If same-origin and clearly securly → reload
-    if (loc.startsWith('https://www.securly.com/')) {
+    if (iframe.contentWindow.location.href.startsWith('https://www.securly.com/')) {
       iframe.src = originalUrl;
     }
   } catch (e) {
-    // Cross-origin error → assume blocked ONLY if we expect same-origin
-    // Skip reload for normal cross-origin sites
-    // (This reduces false positives, but can't perfectly detect Securly anymore)
+    // cross-origin → assume blocked → reload
+    iframe.src = originalUrl;
   }
-}
-
-// Optional: re-check every ~3s only if suspicious
-setInterval(() => {
-  if (originalUrl && iframe.src === originalUrl) {
-    checkIfBlocked();
-  }
-}, 3000);
+}, 600);
 </script>
     
 </body>
