@@ -186,23 +186,46 @@
         urlInput.addEventListener("keypress", (e) => { if (e.key === "Enter") loadSite(); });
     </script>
 
-    <script>
-function detectSecurlyRedirect() {
+<script>
+let originalUrl = '';  // set on load
+
+function loadSite(customUrl = null) {
+  let url = customUrl || urlInput.value.trim();
+  if (!url) return;
+  if (!url.startsWith('http')) url = 'https://' + url;
+  originalUrl = url;
+  iframe.src = url;
+  urlInput.value = url;
+  if (!customUrl) saveToHistory(url);
+}
+
+// Only check after initial load + short delay
+iframe.addEventListener('load', () => {
+  setTimeout(checkIfBlocked, 1200);
+});
+
+function checkIfBlocked() {
+  if (!originalUrl) return;
+
   try {
     const loc = iframe.contentWindow.location.href;
+    // If same-origin and clearly securly → reload
     if (loc.startsWith('https://www.securly.com/')) {
-      // Securly landing page detected → reload original
-      iframe.src = iframe.src;  // simple reload (most common bypass attempt)
-      // or: iframe.src = urlInput.value;  // reload what's in the input box
+      iframe.src = originalUrl;
     }
   } catch (e) {
-    // cross-origin → most likely blocked by Securly → reload
-    iframe.src = iframe.src;
+    // Cross-origin error → assume blocked ONLY if we expect same-origin
+    // Skip reload for normal cross-origin sites
+    // (This reduces false positives, but can't perfectly detect Securly anymore)
   }
 }
 
-// Run check periodically
-setInterval(detectSecurlyRedirect, 800);
+// Optional: re-check every ~3s only if suspicious
+setInterval(() => {
+  if (originalUrl && iframe.src === originalUrl) {
+    checkIfBlocked();
+  }
+}, 3000);
 </script>
     
 </body>
