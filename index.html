@@ -187,29 +187,19 @@
     </script>
 
 <script>
-let originalUrl = '';
+// Remove or comment out the entire setInterval block
+// Keep originalUrl = '' line in loadSite if you want
 
-function loadSite(customUrl = null) {
-  let url = customUrl || urlInput.value.trim();
-  if (!url) return;
-  if (!url.startsWith('http')) url = 'https://' + url;
-  originalUrl = url;
-  iframe.src = url;
-  urlInput.value = url;
-  if (!customUrl) saveToHistory(url);
-}
-
-setInterval(() => {
-  if (!originalUrl) return;
-  try {
-    if (iframe.contentWindow.location.href.startsWith('https://www.securly.com/')) {
-      iframe.src = originalUrl;
-    }
-  } catch (e) {
-    // cross-origin → assume blocked → reload
-    iframe.src = originalUrl;
-  }
-}, 600);
+// Optional: one-time check on load (less aggressive)
+iframe.addEventListener('load', () => {
+  setTimeout(() => {
+    try {
+      if (iframe.contentWindow.location.href.startsWith('https://www.securly.com/')) {
+        iframe.src = originalUrl || urlInput.value;
+      }
+    } catch {}
+  }, 1500);
+});
 </script>
     
 </body>
