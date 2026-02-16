@@ -185,5 +185,25 @@
 
         urlInput.addEventListener("keypress", (e) => { if (e.key === "Enter") loadSite(); });
     </script>
+
+    <script>
+function detectSecurlyRedirect() {
+  try {
+    const loc = iframe.contentWindow.location.href;
+    if (loc.startsWith('https://www.securly.com/')) {
+      // Securly landing page detected → reload original
+      iframe.src = iframe.src;  // simple reload (most common bypass attempt)
+      // or: iframe.src = urlInput.value;  // reload what's in the input box
+    }
+  } catch (e) {
+    // cross-origin → most likely blocked by Securly → reload
+    iframe.src = iframe.src;
+  }
+}
+
+// Run check periodically
+setInterval(detectSecurlyRedirect, 800);
+</script>
+    
 </body>
 </html>
