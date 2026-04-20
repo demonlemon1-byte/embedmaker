@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Web Embedder</title>
+    <title>Web Embedder - Enhanced</title>
     <style>
         :root {
             --primary: #2563eb;
@@ -19,7 +19,7 @@
             overflow: hidden;
         }
         #sidebar {
-            width: 260px;
+            width: 280px;
             background: var(--sidebar);
             border-right: 1px solid #03045e;
             display: flex;
@@ -27,24 +27,28 @@
             padding: 15px;
             flex-shrink: 0;
         }
-        h3 { font-size: 14px; text-transform: uppercase; color: #114111; margin-top: 20px; }
-        #history-list { list-style: none; padding: 0; overflow-y: auto; flex-grow: 1; }
+        h3 { font-size: 14px; text-transform: uppercase; color: #114111; margin: 20px 0 8px; }
+        #history-list { 
+            list-style: none; 
+            padding: 0; 
+            overflow-y: auto; 
+            flex-grow: 1; 
+            max-height: calc(100vh - 200px);
+        }
         .history-item {
-            padding: 8px 12px;
+            padding: 9px 12px;
             background: #f1f5f9;
-            margin-bottom: 5px;
+            margin-bottom: 6px;
             border-radius: 6px;
-            font-size: 11px;
+            font-size: 11.5px;
             cursor: pointer;
             word-break: break-all;
+            transition: background 0.2s;
         }
         .history-item:hover { background: #e2e8f0; }
-
-        .main-content {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-        }
+        
+        .main-content { flex-grow: 1; display: flex; flex-direction: column; }
+        
         .header {
             padding: 15px;
             background: #fff;
@@ -52,6 +56,7 @@
             display: flex;
             gap: 8px;
             align-items: center;
+            flex-wrap: wrap;
         }
         input {
             flex-grow: 1;
@@ -59,9 +64,10 @@
             border: 1px solid #cbd5e1;
             border-radius: 8px;
             outline: none;
+            min-width: 280px;
         }
         button {
-            padding: 10px 15px;
+            padding: 10px 16px;
             background: var(--primary);
             color: white;
             border: none;
@@ -72,7 +78,8 @@
         }
         .btn-alt { background: #64748b; }
         .btn-save { background: #10b981; }
-
+        .btn-download { background: #f59e0b; }
+        
         #embed-viewport {
             flex-grow: 1;
             border: none;
@@ -85,33 +92,47 @@
             background: #fefce8;
             border-bottom: 1px solid #e2e8f0;
         }
+        .status {
+            font-size: 12px;
+            padding: 4px 10px;
+            background: #ecfdf5;
+            color: #10b981;
+            border-radius: 4px;
+            margin-left: auto;
+        }
     </style>
 </head>
 <body>
-
     <div id="sidebar">
-        <h2>Embedder</h2>
+        <h2>Embedder <span style="font-size:12px;opacity:0.7;">Enhanced</span></h2>
         <h3>History</h3>
         <div id="history-list"></div>
-        <button onclick="clearHistory()" style="background:#ef4444; margin-top:10px;">Clear All</button>
+        <button onclick="clearHistory()" style="background:#ef4444; margin-top:12px;">Clear All History</button>
     </div>
 
     <div class="main-content">
         <div class="header">
-            <input type="text" id="urlInput" placeholder="Paste link here...">
+            <input type="text" id="urlInput" placeholder="Paste link here... (e.g. example.com)">
             <button onclick="loadSite()">Go</button>
-            <button class="btn-save" onclick="saveCurrentToHistory()" title="Save current link to history">Save Current</button>
+            <button class="btn-save" onclick="saveCurrentToHistory()" title="Save current page to history">Save</button>
+            <button class="btn-download" onclick="downloadCurrentPage()" title="Download current page as HTML">↓ Page</button>
             <button class="btn-alt" onclick="toggleFullscreen()">Fullscreen</button>
+            <div id="status" class="status" style="display:none;">Ready</div>
         </div>
-        
+       
         <div class="note-area">
-            <b>Note:</b> If you click a link *inside* the window and it doesn't show in the history, click <b>"Save Current"</b> to manually bookmark it. Also, some sites like Google, YouTube, basically all of the big sites won't work here. And if you're using this for blockn't purposes, and it still shows up as blocked, just reembed, it'll work after a bit, but some sites won't. Thanks for coming.
+            <b>Enhanced Features:</b> 
+            • Download support added<br>
+            • Click "↓ Page" to download current page as HTML<br>
+            • Many download links inside the iframe should now trigger properly<br>
+            • Note: Large files, PDFs, images, and same-origin downloads work best.<br>
+            Some heavily protected sites (Google Drive, YouTube, etc.) still won't embed or download.
         </div>
 
-        <iframe 
-            id="embed-viewport" 
-            src="about:blank" 
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups" 
+        <iframe
+            id="embed-viewport"
+            src="about:blank"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"
             referrerpolicy="no-referrer"
             allowfullscreen>
         </iframe>
@@ -121,44 +142,50 @@
         const urlInput = document.getElementById('urlInput');
         const iframe = document.getElementById('embed-viewport');
         const historyList = document.getElementById('history-list');
-
+        const statusEl = document.getElementById('status');
+        
         let history = JSON.parse(localStorage.getItem('embedHistory')) || [];
+        let currentUrl = '';
+
         renderHistory();
 
+        // Main function to load a site
         function loadSite(customUrl = null) {
             let url = customUrl || urlInput.value.trim();
             if (!url) return;
+            
             if (!url.startsWith('http')) url = 'https://' + url;
-
+            
+            currentUrl = url;
             iframe.src = url;
-            urlInput.value = url; // Keep input in sync
+            urlInput.value = url;
+            
             if (!customUrl) saveToHistory(url);
+            showStatus('Loading...', 1500);
+        }
+
+        // Save to history
+        function saveToHistory(url) {
+            if (!url || url === "about:blank") return;
+            history = history.filter(item => item !== url);
+            history.unshift(url);
+            if (history.length > 25) history.pop();
+            localStorage.setItem('embedHistory', JSON.stringify(history));
+            renderHistory();
         }
 
         function saveCurrentToHistory() {
-            // Try to get the URL from the iframe. 
-            // Note: This only works if the site has the same origin or allows it.
             try {
-                const currentUrl = iframe.contentWindow.location.href;
-                if (currentUrl && currentUrl !== "about:blank") {
-                    saveToHistory(currentUrl);
+                const iframeUrl = iframe.contentWindow.location.href;
+                if (iframeUrl && iframeUrl !== "about:blank") {
+                    saveToHistory(iframeUrl);
+                    currentUrl = iframeUrl;
                 } else {
                     saveToHistory(urlInput.value);
                 }
             } catch (e) {
-                // If blocked by security, we save whatever is in the input box
-                saveToHistory(urlInput.value);
+                saveToHistory(urlInput.value || currentUrl);
             }
-        }
-
-        function saveToHistory(url) {
-            if (!url || url === "about:blank") return;
-            // Remove existing instance if it's already there to move it to top
-            history = history.filter(item => item !== url);
-            history.unshift(url);
-            if (history.length > 20) history.pop();
-            localStorage.setItem('embedHistory', JSON.stringify(history));
-            renderHistory();
         }
 
         function renderHistory() {
@@ -166,10 +193,19 @@
             history.forEach(url => {
                 const div = document.createElement('div');
                 div.className = 'history-item';
-                div.innerText = url;
+                div.textContent = url.length > 60 ? url.substring(0, 57) + '...' : url;
+                div.title = url;
                 div.onclick = () => loadSite(url);
                 historyList.appendChild(div);
             });
+        }
+
+        function clearHistory() {
+            if (confirm('Clear all history?')) {
+                history = [];
+                localStorage.removeItem('embedHistory');
+                renderHistory();
+            }
         }
 
         function toggleFullscreen() {
@@ -177,30 +213,98 @@
             else if (iframe.webkitRequestFullscreen) iframe.webkitRequestFullscreen();
         }
 
-        function clearHistory() {
-            history = [];
-            localStorage.removeItem('embedHistory');
-            renderHistory();
+        // ============== DOWNLOAD FEATURES ==============
+
+        // Download current page as HTML
+        function downloadCurrentPage() {
+            if (!currentUrl) {
+                alert("No page loaded to download.");
+                return;
+            }
+            
+            showStatus('Preparing download...', 2000);
+            
+            try {
+                // Try to get clean HTML from iframe (best case)
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                let htmlContent = iframeDoc.documentElement.outerHTML;
+                
+                // Create blob and trigger download
+                const blob = new Blob([htmlContent], { type: 'text/html' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = getFilenameFromUrl(currentUrl) + '.html';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                showStatus('Page downloaded!', 2500);
+            } catch (err) {
+                // Fallback: open the URL in new tab (user can then save manually)
+                console.warn("Direct iframe download blocked by CORS. Using fallback.");
+                window.open(currentUrl, '_blank');
+                showStatus('Opened in new tab - save manually', 3000);
+            }
         }
 
-        urlInput.addEventListener("keypress", (e) => { if (e.key === "Enter") loadSite(); });
+        // Helper: Generate nice filename from URL
+        function getFilenameFromUrl(url) {
+            try {
+                const urlObj = new URL(url);
+                let hostname = urlObj.hostname.replace('www.', '');
+                let path = urlObj.pathname.substring(1).replace(/[^a-zA-Z0-9]/g, '_');
+                if (path.length > 30) path = path.substring(0, 30);
+                return hostname + (path ? '_' + path : '');
+            } catch {
+                return 'downloaded_page';
+            }
+        }
+
+        // Show temporary status message
+        function showStatus(message, timeout = 2000) {
+            statusEl.textContent = message;
+            statusEl.style.display = 'block';
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, timeout);
+        }
+
+        // Enhanced iframe load handler - helps with some redirect blockers
+        iframe.addEventListener('load', () => {
+            try {
+                currentUrl = iframe.contentWindow.location.href;
+                urlInput.value = currentUrl;
+            } catch (e) {
+                // Cross-origin - keep the input URL
+            }
+        });
+
+        // Keyboard support
+        urlInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") loadSite();
+        });
+
+        // Bonus: Auto-detect and improve some download links (experimental)
+        // This runs after iframe loads but has limitations due to same-origin policy
+        iframe.addEventListener('load', () => {
+            setTimeout(() => {
+                try {
+                    const iframeDoc = iframe.contentDocument;
+                    if (!iframeDoc) return;
+                    
+                    // You can extend this to automatically add download attributes
+                    // to common file links (pdf, zip, etc.)
+                    const links = iframeDoc.querySelectorAll('a[href$=".pdf"], a[href$=".zip"], a[href$=".docx"]');
+                    links.forEach(link => {
+                        if (!link.hasAttribute('download')) {
+                            link.setAttribute('download', '');
+                        }
+                    });
+                } catch (e) {
+                    // Expected on most sites due to CORS
+                }
+            }, 1200);
+        });
     </script>
-
-<script>
-// Remove or comment out the entire setInterval block
-// Keep originalUrl = '' line in loadSite if you want
-
-// Optional: one-time check on load (less aggressive)
-iframe.addEventListener('load', () => {
-  setTimeout(() => {
-    try {
-      if (iframe.contentWindow.location.href.startsWith('https://www.securly.com/')) {
-        iframe.src = originalUrl || urlInput.value;
-      }
-    } catch {}
-  }, 1500);
-});
-</script>
-    
 </body>
 </html>
